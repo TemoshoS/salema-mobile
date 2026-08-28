@@ -6,27 +6,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import * as Location from "expo-location";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    Vibration,
-    View
-} from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, FlatList, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, Vibration, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Header from "../components/Header";
 import { api } from "../config/api";
 import { IMAGES } from "../constants/assets";
 
 export default function Home() {
+
+    const sendingSOSRef = useRef(false);
     const [contacts, setContacts] = useState<any[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
 
@@ -38,10 +27,10 @@ export default function Home() {
     const [editPhone, setEditPhone] = useState("");
     const [editRelationship, setEditRelationship] = useState("");
 
-  
+
     const [voiceEnabled, setVoiceEnabled] = useState(false);
     const [voiceCommands, setVoiceCommands] = useState<string[]>([]);
-  
+
 
     const [selectedContact, setSelectedContact] = useState<any>(null);
     const [viewModalVisible, setViewModalVisible] = useState(false);
@@ -57,110 +46,138 @@ export default function Home() {
         "inactive" | "activating" | "active"
     >("inactive");
 
+
     const sendSOS = useCallback(async () => {
-        if (sendingSOS) return;
-    
+        if (sendingSOSRef.current) {
+            console.log("🚨 SOS already being sent...");
+            return;
+        }
+
         try {
+            sendingSOSRef.current = true;
             setSendingSOS(true);
             setIconState("activating");
-    
+
+            console.log("🚨 Sending SOS...");
+
             const userId = await AsyncStorage.getItem("userId");
-    
+
             if (!userId) {
-                showError("User Not Found", "Please log in again.");
+                showError(
+                    "User Not Found",
+                    "Please log in again."
+                );
+
                 setIconState("inactive");
                 return;
             }
-    
+
             // Get selected security company
-            const securityCompanyId = await AsyncStorage.getItem(
-                "selectedSecurityCompanyId"
+            const securityCompanyId =
+                await AsyncStorage.getItem(
+                    "selectedSecurityCompanyId"
+                );
+
+            console.log(
+                "🛡️ Selected Security Company:",
+                securityCompanyId
             );
 
+            // Request location permission
             const { status } =
                 await Location.requestForegroundPermissionsAsync();
-    
+
             if (status !== "granted") {
                 showInfo(
                     "Location Permission",
                     "Please allow location access to send an SOS."
                 );
-    
+
                 setIconState("inactive");
                 return;
             }
-    
+
+            // Get current location
             const location =
                 await Location.getCurrentPositionAsync({
                     accuracy: Location.Accuracy.High,
                 });
-    
+
+            const latitude = location.coords.latitude;
+            const longitude = location.coords.longitude;
+
+            console.log("📍 SOS Location:", {
+                latitude,
+                longitude,
+            });
+
+            // Vibrate phone
             Vibration.vibrate([300, 200, 300]);
-           
+
             // Send SOS with selected security company
             await api.post("/alerts/send", {
                 userId,
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-                ...(securityCompanyId ? { securityCompanyId } : {}),
+                latitude,
+                longitude,
+                ...(securityCompanyId
+                    ? { securityCompanyId }
+                    : {}),
             });
-    
+
+            console.log("🚨 SOS sent successfully");
+
             setIconState("active");
-    
+
             showSuccess(
                 "SOS Activated",
                 "Emergency alert sent successfully."
             );
-    
+
             setTimeout(() => {
                 setIconState("inactive");
             }, 10000);
-    
+
         } catch (error: any) {
+            console.error("🚨 SOS Error:", error);
+
             setIconState("inactive");
-    
+
             showError(
                 "SOS Failed",
-                error.response?.data?.message ??
+                error?.response?.data?.message ??
                 "Unable to send SOS."
             );
-    
         } finally {
+            sendingSOSRef.current = false;
             setSendingSOS(false);
         }
-    }, [sendingSOS]);
+    }, []);
+
+
 
     const {
         isListening,
         startListening,
         stopListening,
-      } = useVoiceEmergency(sendSOS, {
+    } = useVoiceEmergency(sendSOS, {
         commands: voiceCommands,
-      });
+    });
 
 
-      useEffect(() => {
+    useEffect(() => {
         if (voiceEnabled) {
-          startListening();
+            startListening();
         } else {
-          stopListening();
+            stopListening();
         }
-      
-        return () => {
-          stopListening();
-        };
-      }, [voiceEnabled, startListening, stopListening]);
 
-      useEffect(() => {
-        if (!voiceEnabled) return;
-      
-        const restart = async () => {
-          await stopListening();
-          await startListening();
+        return () => {
+            stopListening();
         };
-      
-        restart();
-      }, [voiceCommands]);
+    }, [voiceEnabled, startListening, stopListening]);
+
+
+
     useEffect(() => {
         loadContacts();
     }, []);
@@ -181,30 +198,30 @@ export default function Home() {
     };
 
 
-   
+
 
     useFocusEffect(
         useCallback(() => {
-          const loadVoiceSettings = async () => {
-            const saved =
-              await AsyncStorage.getItem("VOICE_EMERGENCY_PHRASES");
-      
-            const enabled =
-              (await AsyncStorage.getItem(
-                "VOICE_EMERGENCY_ENABLED"
-              )) === "true";
-      
-            const commands = saved
-              ? JSON.parse(saved)
-              : ["salema help"];
-      
-            setVoiceCommands(commands);
-            setVoiceEnabled(enabled);
-          };
-      
-          loadVoiceSettings();
+            const loadVoiceSettings = async () => {
+                const saved =
+                    await AsyncStorage.getItem("VOICE_EMERGENCY_PHRASES");
+
+                const enabled =
+                    (await AsyncStorage.getItem(
+                        "VOICE_EMERGENCY_ENABLED"
+                    )) === "true";
+
+                const commands = saved
+                    ? JSON.parse(saved)
+                    : ["salema help"];
+
+                setVoiceCommands(commands);
+                setVoiceEnabled(enabled);
+            };
+
+            loadVoiceSettings();
         }, [])
-      );
+    );
 
     useShake(() => {
         if (!sendingSOS) {

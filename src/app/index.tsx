@@ -166,44 +166,7 @@ export default function WelcomeScreen() {
             <Text style={styles.arrow}>→</Text>
           </Pressable>
         </Animated.View>
-
-        {/* ========================================== */}
-        {/* SECURITY COMPANY */}
-        {/* ========================================== */}
-
-        <Animated.View
-          style={{
-            width: "100%",
-            transform: [{ translateY: companyAnim }],
-          }}
-        >
-          <Pressable
-            style={({ pressed }) => [
-              styles.companyCard,
-              pressed && styles.pressed,
-            ]}
-            onPress={() =>
-              router.push("/security-company/login")
-            }
-          >
-            <View style={styles.companyCircle}>
-              <Text style={styles.icon}>🏢</Text>
-            </View>
-
-            <View style={styles.cardBody}>
-              <Text style={styles.cardTitle}>
-                Security Company
-              </Text>
-
-              <Text style={styles.cardSubtitle}>
-                Manage incidents, officers, branches and
-                emergency responses.
-              </Text>
-            </View>
-
-            <Text style={styles.arrow}>→</Text>
-          </Pressable>
-        </Animated.View>
+      
 
         {/* ========================================== */}
         {/* SECURITY OFFICER */}

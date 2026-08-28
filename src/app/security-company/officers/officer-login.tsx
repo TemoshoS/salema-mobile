@@ -1,12 +1,16 @@
 import { api } from "@/config/api";
+import { IMAGES } from "@/constants/assets";
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     KeyboardAvoidingView,
     Platform,
+    StatusBar,
     StyleSheet,
     Text,
     TextInput,
@@ -16,325 +20,461 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SecurityOfficerLogin() {
-    const router = useRouter();
+  const router = useRouter();
 
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-    const handleLogin = async () => {
-        if (!email.trim() || !password.trim()) {
-            Alert.alert(
-                "Missing Information",
-                "Please enter your email and password."
-            );
-            return;
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert(
+        "Missing Information",
+        "Please enter your email and password."
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await api.post(
+        "/security-company/officers/login",
+        {
+          email: email.trim().toLowerCase(),
+          password,
         }
+      );
 
-        try {
-            setLoading(true);
+      const { token, officer } = response.data;
 
-            const response = await api.post(
-                "/security-company/officers/login",
-                {
-                    email: email.trim().toLowerCase(),
-                    password,
-                }
-            );
+      // Save officer authentication
+      await AsyncStorage.setItem(
+        "officerToken",
+        token
+      );
 
-            const { token, officer } = response.data;
+      await AsyncStorage.setItem(
+        "officerData",
+        JSON.stringify(officer)
+      );
 
-            // ==========================================
-            // SAVE OFFICER AUTHENTICATION
-            // ==========================================
+      router.replace(
+        "/security-company/officers/dashboard"
+      );
+    } catch (error: any) {
+      console.log(
+        "OFFICER LOGIN ERROR:",
+        error.response?.data || error.message
+      );
 
-            await AsyncStorage.setItem(
-                "officerToken",
-                token
-            );
+      Alert.alert(
+        "Login Failed",
+        error.response?.data?.message ||
+          "Unable to login. Please check your details."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            await AsyncStorage.setItem(
-                "officerData",
-                JSON.stringify(officer)
-            );
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
 
-            // ==========================================
-            // GO TO OFFICER DASHBOARD
-            // ==========================================
-
-            router.replace(
-                "/security-officer/dashboard"
-            );
-        } catch (error: any) {
-            console.log(
-                "OFFICER LOGIN ERROR:",
-                error.response?.data || error.message
-            );
-
-            Alert.alert(
-                "Login Failed",
-                error.response?.data?.message ||
-                    "Unable to login. Please check your details."
-            );
-        } finally {
-            setLoading(false);
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={
+          Platform.OS === "ios"
+            ? "padding"
+            : undefined
         }
-    };
+      >
+        {/* BACK BUTTON */}
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
-                style={styles.keyboardView}
-                behavior={
-                    Platform.OS === "ios"
-                        ? "padding"
-                        : undefined
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          disabled={loading}
+        >
+          <Ionicons
+            name="arrow-back"
+            size={24}
+            color="#002E15"
+          />
+
+          <Text style={styles.backText}>
+            Back
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.content}>
+
+          {/* LOGO */}
+
+          <View style={styles.logoCircle}>
+            <Image
+              source={IMAGES.logo}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
+
+          {/* TITLE */}
+
+          <Text style={styles.title}>
+            Security Officer Login
+          </Text>
+
+          <Text style={styles.subtitle}>
+            Sign in to manage your assigned
+            incidents and respond to emergencies.
+          </Text>
+
+          {/* LOGIN CARD */}
+
+          <View style={styles.card}>
+
+            {/* EMAIL */}
+
+            <Text style={styles.label}>
+              Email Address
+            </Text>
+
+            <View style={styles.inputContainer}>
+              <Ionicons
+                name="mail-outline"
+                size={22}
+                color="#666"
+              />
+
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your email"
+                placeholderTextColor="#999"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={email}
+                onChangeText={setEmail}
+                editable={!loading}
+              />
+            </View>
+
+            {/* PASSWORD */}
+
+            <Text style={styles.label}>
+              Password
+            </Text>
+
+            <View style={styles.inputContainer}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={22}
+                color="#666"
+              />
+
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor="#999"
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                value={password}
+                onChangeText={setPassword}
+                editable={!loading}
+              />
+
+              <TouchableOpacity
+                onPress={() =>
+                  setShowPassword(!showPassword)
                 }
+                disabled={loading}
+              >
+                <Ionicons
+                  name={
+                    showPassword
+                      ? "eye-off-outline"
+                      : "eye-outline"
+                  }
+                  size={22}
+                  color="#666"
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* LOGIN BUTTON */}
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleLogin}
+              disabled={loading}
             >
-                <View style={styles.content}>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>
+                  Sign In
+                </Text>
+              )}
+            </TouchableOpacity>
 
-                    {/* Logo / Icon */}
+          </View>
 
-                    <View style={styles.iconContainer}>
-                        <Text style={styles.icon}>🛡️</Text>
-                    </View>
+          {/* INFORMATION */}
 
-                    {/* Title */}
+          
 
-                    <Text style={styles.title}>
-                        Security Officer
-                    </Text>
+          <Text style={styles.bottomText}>
+            Salema • Security Officer Portal
+          </Text>
 
-                    <Text style={styles.subtitle}>
-                        Sign in to manage your assigned
-                        incidents.
-                    </Text>
+        </View>
+      </KeyboardAvoidingView>
 
-                    {/* Email */}
+      {/* LOADING OVERLAY */}
 
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.label}>
-                            Email Address
-                        </Text>
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator
+              size="large"
+              color="#002E15"
+            />
 
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Enter your email"
-                            placeholderTextColor="#999"
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            editable={!loading}
-                        />
-                    </View>
-
-                    {/* Password */}
-
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.label}>
-                            Password
-                        </Text>
-
-                        <View style={styles.passwordContainer}>
-                            <TextInput
-                                style={styles.passwordInput}
-                                placeholder="Enter your password"
-                                placeholderTextColor="#999"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry={
-                                    !showPassword
-                                }
-                                autoCapitalize="none"
-                                editable={!loading}
-                            />
-
-                            <TouchableOpacity
-                                onPress={() =>
-                                    setShowPassword(
-                                        !showPassword
-                                    )
-                                }
-                            >
-                                <Text
-                                    style={
-                                        styles.showPassword
-                                    }
-                                >
-                                    {showPassword
-                                        ? "Hide"
-                                        : "Show"}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    {/* Login */}
-
-                    <TouchableOpacity
-                        style={[
-                            styles.loginButton,
-                            loading &&
-                                styles.loginButtonDisabled,
-                        ]}
-                        onPress={handleLogin}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <ActivityIndicator
-                                color="#fff"
-                            />
-                        ) : (
-                            <Text
-                                style={
-                                    styles.loginButtonText
-                                }
-                            >
-                                Sign In
-                            </Text>
-                        )}
-                    </TouchableOpacity>
-
-                    {/* Information */}
-
-                    <View style={styles.infoBox}>
-                        <Text style={styles.infoText}>
-                            Only active security officers
-                            can access the officer portal.
-                        </Text>
-                    </View>
-                </View>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
-    );
+            <Text style={styles.loadingText}>
+              Signing in...
+            </Text>
+          </View>
+        </View>
+      )}
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#EEF6F3",
-    },
+  container: {
+    flex: 1,
+    backgroundColor: "#EEF6F3",
+  },
 
-    keyboardView: {
-        flex: 1,
-    },
+  keyboardView: {
+    flex: 1,
+  },
 
-    content: {
-        flex: 1,
-        justifyContent: "center",
-        paddingHorizontal: 24,
-    },
+  // ==========================================
+  // BACK BUTTON
+  // ==========================================
 
-    iconContainer: {
-        width: 90,
-        height: 90,
-        borderRadius: 45,
-        backgroundColor: "#DDEDE5",
-        justifyContent: "center",
-        alignItems: "center",
-        alignSelf: "center",
-        marginBottom: 20,
-    },
+  backButton: {
+    position: "absolute",
+    top: 12,
+    left: 20,
+    zIndex: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 8,
+  },
 
-    icon: {
-        fontSize: 42,
-    },
+  backText: {
+    marginLeft: 6,
+    color: "#002E15",
+    fontSize: 15,
+    fontWeight: "600",
+  },
 
-    title: {
-        fontSize: 28,
-        fontWeight: "700",
-        color: "#002E15",
-        textAlign: "center",
-    },
+  // ==========================================
+  // CONTENT
+  // ==========================================
 
-    subtitle: {
-        fontSize: 15,
-        color: "#777",
-        textAlign: "center",
-        marginTop: 8,
-        marginBottom: 35,
-        lineHeight: 22,
-    },
+  content: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 25,
+  },
 
-    inputContainer: {
-        marginBottom: 18,
-    },
+  // ==========================================
+  // LOGO
+  // ==========================================
 
-    label: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: "#333",
-        marginBottom: 7,
-    },
+  logoCircle: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "#002E15",
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center",
+    marginBottom: 20,
+  },
 
-    input: {
-        height: 52,
-        backgroundColor: "#fff",
-        borderRadius: 13,
-        paddingHorizontal: 15,
-        fontSize: 15,
-        color: "#111",
-        borderWidth: 1,
-        borderColor: "#E5E7EB",
-    },
+  logo: {
+    width: 90,
+    height: 90,
+    tintColor: "#fff",
+  },
 
-    passwordContainer: {
-        height: 52,
-        backgroundColor: "#fff",
-        borderRadius: 13,
-        borderWidth: 1,
-        borderColor: "#E5E7EB",
-        flexDirection: "row",
-        alignItems: "center",
-        paddingLeft: 15,
-        paddingRight: 12,
-    },
+  // ==========================================
+  // TITLE
+  // ==========================================
 
-    passwordInput: {
-        flex: 1,
-        fontSize: 15,
-        color: "#111",
-    },
+  title: {
+    fontSize: 30,
+    fontWeight: "700",
+    color: "#002E15",
+    textAlign: "center",
+  },
 
-    showPassword: {
-        color: "#002E15",
-        fontSize: 13,
-        fontWeight: "700",
-    },
+  subtitle: {
+    marginTop: 8,
+    marginBottom: 30,
+    textAlign: "center",
+    color: "#666",
+    fontSize: 15,
+    lineHeight: 23,
+    paddingHorizontal: 10,
+  },
 
-    loginButton: {
-        height: 54,
-        backgroundColor: "#002E15",
-        borderRadius: 14,
-        justifyContent: "center",
-        alignItems: "center",
-        marginTop: 8,
-    },
+  // ==========================================
+  // CARD
+  // ==========================================
 
-    loginButtonDisabled: {
-        opacity: 0.7,
-    },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 22,
 
-    loginButtonText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "700",
-    },
+    elevation: 5,
 
-    infoBox: {
-        backgroundColor: "#E8F3ED",
-        borderRadius: 13,
-        padding: 14,
-        marginTop: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 3,
     },
+  },
 
-    infoText: {
-        color: "#35614A",
-        fontSize: 13,
-        textAlign: "center",
-        lineHeight: 19,
+  // ==========================================
+  // INPUTS
+  // ==========================================
+
+  label: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#444",
+    marginBottom: 8,
+    marginTop: 8,
+  },
+
+  inputContainer: {
+    height: 56,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 15,
+    marginBottom: 18,
+    backgroundColor: "#fff",
+  },
+
+  input: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 16,
+    color: "#222",
+  },
+
+  // ==========================================
+  // BUTTON
+  // ==========================================
+
+  button: {
+    height: 56,
+    backgroundColor: "#002E15",
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 10,
+  },
+
+  buttonText: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "700",
+  },
+
+  // ==========================================
+  // INFO
+  // ==========================================
+
+  infoBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E8F3ED",
+    borderRadius: 13,
+    padding: 14,
+    marginTop: 20,
+  },
+
+  infoText: {
+    flex: 1,
+    marginLeft: 10,
+    color: "#35614A",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+
+  // ==========================================
+  // FOOTER
+  // ==========================================
+
+  bottomText: {
+    textAlign: "center",
+    marginTop: 25,
+    color: "#999",
+    fontSize: 13,
+  },
+
+  // ==========================================
+  // LOADING
+  // ==========================================
+
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  loadingBox: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 35,
+    paddingVertical: 28,
+    borderRadius: 18,
+    alignItems: "center",
+
+    elevation: 8,
+
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: {
+      width: 0,
+      height: 4,
     },
+  },
+
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#002E15",
+  },
 });

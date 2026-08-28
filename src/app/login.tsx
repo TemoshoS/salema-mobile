@@ -138,14 +138,14 @@ export default function Login() {
     } catch (error: any) {
 
       const message =
-      error.response?.data?.message || "OTP verification failed.";
-  
-    showError(message, "Verification Failed");
-  
-    if (message === "OTP expired") {
-      setOtp("");
-      setShowOtp(false);
-    }
+        error.response?.data?.message || "OTP verification failed.";
+
+      showError(message, "Verification Failed");
+
+      if (message === "OTP expired") {
+        setOtp("");
+        setShowOtp(false);
+      }
 
     } finally {
       setLoading(false);
@@ -155,6 +155,21 @@ export default function Login() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
+      <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          disabled={loading}
+        >
+          <Ionicons
+            name="arrow-back"
+            size={24}
+            color="#002E15"
+          />
+
+          <Text style={styles.backText}>
+            Back
+          </Text>
+        </TouchableOpacity>
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -336,7 +351,7 @@ export default function Login() {
                   Verify OTP
                 </Text>
               </TouchableOpacity>
-            
+
             </>
           )}
         </View>
@@ -381,11 +396,32 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#EEF6F3",
   },
+  backButton: {
+    position: "absolute",
+    top: 55,
+    left: 20,
+    zIndex: 100,
+   
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 8,
+ 
+   
 
+  
+  },
+  backText: {
+    marginLeft: 6,
+    color: "#002E15",
+    fontSize: 15,
+    fontWeight: "600",
+  },
   content: {
     flexGrow: 1,
     justifyContent: "center",
-    padding: 25,
+    paddingHorizontal: 25,
+    paddingTop: 90,
+    paddingBottom: 40,
   },
 
   logoCircle: {

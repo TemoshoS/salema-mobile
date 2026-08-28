@@ -25,8 +25,20 @@ export default function useVoiceEmergency(
 ) {
   const [isListening, setIsListening] = useState(false);
 
+  const isListeningRef = useRef(false);
+  const isStarting = useRef(false);
+  const isStopping = useRef(false);
+  const shouldListen = useRef(false);
+
+  const restartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTrigger = useRef(0);
-  const restarting = useRef(false);
+
+  // Keep the latest callback without changing the recognition callbacks
+  const onEmergencyRef = useRef(onEmergency);
+
+  useEffect(() => {
+    onEmergencyRef.current = onEmergency;
+  }, [onEmergency]);
 
   const commandList = useMemo(() => {
     const list =
@@ -36,137 +48,211 @@ export default function useVoiceEmergency(
         ? [command]
         : ["salema help"];
 
-    return list.map((c) =>
-      c
-        .toLowerCase()
-        .replace(/[^\w\s]/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
-    );
+    return list
+      .map((c) =>
+        c
+          .toLowerCase()
+          .replace(/[^\w\s]/g, "")
+          .replace(/\s+/g, " ")
+          .trim()
+      )
+      .filter(Boolean);
   }, [command, commands]);
 
-  const restartRecognition = useCallback(
-    async (delay: number) => {
-      if (restarting.current) return;
+  const commandListRef = useRef(commandList);
 
-      restarting.current = true;
+  useEffect(() => {
+    commandListRef.current = commandList;
+  }, [commandList]);
 
-      setTimeout(async () => {
-        try {
-          await ExpoSpeechRecognitionModule.start({
-            lang: language,
-            continuous: true,
-            interimResults: true,
-          });
+  const clearRestartTimer = useCallback(() => {
+    if (restartTimer.current) {
+      clearTimeout(restartTimer.current);
+      restartTimer.current = null;
+    }
+  }, []);
 
-          console.log("🎤 Restarted listening");
-        } catch (e) {
-          console.log("Restart failed:", e);
-        } finally {
-          restarting.current = false;
-        }
-      }, delay);
-    },
-    [language]
-  );
+  const startRecognition = useCallback(async () => {
+    if (!shouldListen.current) return;
 
-  useSpeechRecognitionEvent("result", (event) => {
-    console.log("RESULT EVENT", JSON.stringify(event, null, 2));
-    const now = Date.now();
-
-    if (now - lastTrigger.current < cooldown) {
+    if (isStarting.current || isListeningRef.current) {
       return;
     }
 
-    const transcript =
-      event.results
-        ?.map((r) => r.transcript)
-        .join(" ")
-        .toLowerCase()
-        .replace(/[^\w\s]/g, "")
-        .replace(/\s+/g, " ")
-        .trim() ?? "";
+    try {
+      isStarting.current = true;
+
+      console.log("🎤 Starting speech recognition...");
+
+      await ExpoSpeechRecognitionModule.start({
+        lang: language,
+        continuous: false,
+        interimResults: true,
+      });
+
+      console.log("🎤 Speech recognition started");
+    } catch (error) {
+      console.log("🎤 Start error:", error);
+    } finally {
+      isStarting.current = false;
+    }
+  }, [language]);
+
+  const scheduleRestart = useCallback(() => {
+    if (!shouldListen.current) return;
+
+    clearRestartTimer();
+
+    restartTimer.current = setTimeout(() => {
+      restartTimer.current = null;
+
+      if (!shouldListen.current) return;
+
+      startRecognition();
+    }, 700);
+  }, [clearRestartTimer, startRecognition]);
+
+  useSpeechRecognitionEvent("result", (event) => {
+    console.log(
+      "🎤 RESULT:",
+      JSON.stringify(event, null, 2)
+    );
+
+    const results = event.results ?? [];
+
+    const transcript = results
+      .map((result) => result.transcript)
+      .join(" ")
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
 
     if (!transcript) return;
 
     console.log("🎤 Heard:", transcript);
+    console.log("🎤 Commands:", commandListRef.current);
 
-    const matched = commandList.some((phrase) =>
+    const matched = commandListRef.current.some((phrase) =>
       transcript.includes(phrase)
     );
 
-    if (!matched) return;
+    if (!matched) {
+      console.log("🎤 No emergency phrase matched");
+      return;
+    }
+
+    const now = Date.now();
+
+    if (now - lastTrigger.current < cooldown) {
+      console.log("🎤 Emergency ignored because of cooldown");
+      return;
+    }
 
     lastTrigger.current = now;
 
+    console.log("🚨 EMERGENCY PHRASE DETECTED");
+
     Vibration.vibrate(vibrationPattern);
 
-    console.log("🚨 Emergency Triggered");
-
-    onEmergency();
+    onEmergencyRef.current();
   });
 
   useSpeechRecognitionEvent("start", () => {
     console.log("🎤 Voice recognition started");
+
+    isListeningRef.current = true;
     setIsListening(true);
   });
 
   useSpeechRecognitionEvent("end", () => {
-    console.log("🎤 Voice recognition stopped");
+    console.log("🎤 Voice recognition ended");
+
+    isListeningRef.current = false;
     setIsListening(false);
 
-    restartRecognition(500);
+    if (shouldListen.current) {
+      scheduleRestart();
+    }
   });
 
   useSpeechRecognitionEvent("error", (event) => {
     console.log("🎤 Voice recognition error:", event);
 
+    isListeningRef.current = false;
     setIsListening(false);
 
-    restartRecognition(1000);
+    if (shouldListen.current) {
+      scheduleRestart();
+    }
   });
 
   const startListening = useCallback(async () => {
+    if (shouldListen.current) {
+      return;
+    }
+
     try {
       const permission =
         await ExpoSpeechRecognitionModule.requestPermissionsAsync();
 
       if (!permission.granted) {
-        console.warn("Microphone permission denied.");
+        console.warn("🎤 Microphone permission denied");
         return;
       }
 
-      if (isListening || restarting.current) return;
+      shouldListen.current = true;
 
-      await ExpoSpeechRecognitionModule.start({
-        lang: language,
-        continuous: true,
-        interimResults: true,
-      });
+      clearRestartTimer();
+
+      await startRecognition();
     } catch (error) {
-      console.error("Failed to start voice recognition:", error);
+      console.error(
+        "🎤 Failed to start voice recognition:",
+        error
+      );
     }
-  }, [isListening, language]);
+  }, [clearRestartTimer, startRecognition]);
 
   const stopListening = useCallback(async () => {
+    shouldListen.current = false;
+
+    clearRestartTimer();
+
+    if (isStopping.current) {
+      return;
+    }
+
     try {
-      restarting.current = false;
+      isStopping.current = true;
 
-      if (isListening) {
-        await ExpoSpeechRecognitionModule.stop();
-      }
+      console.log("🎤 Stopping voice recognition");
 
+      ExpoSpeechRecognitionModule.stop();
+
+      isListeningRef.current = false;
       setIsListening(false);
     } catch (error) {
-      console.error("Failed to stop voice recognition:", error);
+      console.log("🎤 Stop error:", error);
+    } finally {
+      isStopping.current = false;
+      isStarting.current = false;
     }
-  }, [isListening]);
+  }, [clearRestartTimer]);
 
   useEffect(() => {
     return () => {
-      ExpoSpeechRecognitionModule.stop();
+      shouldListen.current = false;
+
+      clearRestartTimer();
+
+      try {
+        ExpoSpeechRecognitionModule.stop();
+      } catch (error) {
+        console.log("🎤 Cleanup stop error:", error);
+      }
     };
-  }, []);
+  }, [clearRestartTimer]);
 
   return {
     isListening,
@@ -174,3 +260,4 @@ export default function useVoiceEmergency(
     stopListening,
   };
 }
+
