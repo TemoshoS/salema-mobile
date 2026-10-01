@@ -3,6 +3,8 @@ import Toast from "react-native-toast-message";
 import { toastConfig } from "../components/AppToast";
 
 export default function Layout() {
+
+
   return (
     <>
       <Stack screenOptions={{ headerShown: false }} />

@@ -20,6 +20,7 @@
     },
     "android": {
       "package": "com.maduane.salema",
+      "googleServicesFile": "./google-services.json",
       "versionCode": 2,
       "config": {
         "googleMaps": {
@@ -74,7 +75,9 @@
         {
           "microphonePermission": "Salema needs access to your microphone to enable voice commands for emergency alerts."
         }
-      ]
+      ],
+      "expo-image",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

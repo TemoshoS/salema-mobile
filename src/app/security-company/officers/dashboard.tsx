@@ -45,23 +45,23 @@ export default function SecurityOfficerDashboard() {
     try {
       const token = await AsyncStorage.getItem("officerToken");
       const officerData = await AsyncStorage.getItem("officerData");
-  
+
       if (!token || !officerData) {
         router.replace(
           "/security-company/officers/officer-login"
         );
         return;
       }
-  
+
       const parsedOfficer = JSON.parse(officerData);
-  
+
       setOfficer(parsedOfficer);
     } catch (error) {
       console.error("LOAD OFFICER ERROR:", error);
-  
+
       await AsyncStorage.removeItem("officerToken");
       await AsyncStorage.removeItem("officerData");
-  
+
       router.replace(
         "/security-company/officers/officer-login"
       );
@@ -71,17 +71,17 @@ export default function SecurityOfficerDashboard() {
   };
   const toggleOfficerStatus = async () => {
     if (!officer || updatingStatus) return;
-  
+
     const newStatus: Officer["status"] =
       officer.status === "active"
         ? "inactive"
         : "active";
-  
+
     try {
       setUpdatingStatus(true);
-  
+
       const token = await AsyncStorage.getItem("officerToken");
-  
+
       const response = await api.patch(
         "/security-company/officers/status",
         {
@@ -93,14 +93,14 @@ export default function SecurityOfficerDashboard() {
           },
         }
       );
-  
+
       const updatedOfficer = {
         ...officer,
         status: response.data.officer.status,
       };
-  
+
       setOfficer(updatedOfficer);
-  
+
       await AsyncStorage.setItem(
         "officerData",
         JSON.stringify(updatedOfficer)
@@ -110,11 +110,11 @@ export default function SecurityOfficerDashboard() {
         "UPDATE OFFICER STATUS ERROR:",
         error?.response?.data || error.message
       );
-  
+
       Alert.alert(
         "Error",
         error?.response?.data?.message ||
-          "Failed to update your status."
+        "Failed to update your status."
       );
     } finally {
       setUpdatingStatus(false);
@@ -136,7 +136,7 @@ export default function SecurityOfficerDashboard() {
           onPress: async () => {
             await AsyncStorage.removeItem("officerToken");
             await AsyncStorage.removeItem("officerData");
-  
+
             router.replace("/");
           },
         },
@@ -186,40 +186,40 @@ export default function SecurityOfficerDashboard() {
             </Text>
           </View>
 
-       
-          <View style={styles.statusContainer}>
-  <Text
-    style={[
-      styles.statusText,
-      officer.status === "active"
-        ? styles.activeText
-        : styles.inactiveText,
-    ]}
-  >
-    {officer.status === "active"
-      ? "Active"
-      : "Inactive"}
-  </Text>
 
-  {updatingStatus ? (
-    <ActivityIndicator
-      size="small"
-      color="#fff"
-    />
-  ) : (
-    <Switch
-      value={officer.status === "active"}
-      onValueChange={toggleOfficerStatus}
-      disabled={updatingStatus}
-      trackColor={{
-        false: "#FF5252",
-        true: "#00C853",
-      }}
-      thumbColor="#fff"
-      ios_backgroundColor="#FF5252"
-    />
-  )}
-</View>
+          <View style={styles.statusContainer}>
+            <Text
+              style={[
+                styles.statusText,
+                officer.status === "active"
+                  ? styles.activeText
+                  : styles.inactiveText,
+              ]}
+            >
+              {officer.status === "active"
+                ? "Active"
+                : "Inactive"}
+            </Text>
+
+            {updatingStatus ? (
+              <ActivityIndicator
+                size="small"
+                color="#fff"
+              />
+            ) : (
+              <Switch
+                value={officer.status === "active"}
+                onValueChange={toggleOfficerStatus}
+                disabled={updatingStatus}
+                trackColor={{
+                  false: "#FF5252",
+                  true: "#00C853",
+                }}
+                thumbColor="#fff"
+                ios_backgroundColor="#FF5252"
+              />
+            )}
+          </View>
 
 
         </View>
@@ -420,11 +420,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  
+
   activeText: {
     color: "#00C853",
   },
-  
+
   inactiveText: {
     color: "#FF5252",
   },

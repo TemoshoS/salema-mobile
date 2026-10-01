@@ -1,10 +1,10 @@
+
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import CustomAlert from "../components/CustomAlert";
 import Header from "../components/Header";
 import { api } from "../config/api";
 
@@ -27,17 +28,65 @@ interface User {
     createdAt: string;
 }
 
+type AlertType = "error" | "warning" | "success" | "info";
+
 export default function Profile() {
     const router = useRouter();
 
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
+    const [alertVisible, setAlertVisible] = useState(false);
+    const [alertTitle, setAlertTitle] = useState("");
+    const [alertMessage, setAlertMessage] = useState("");
+    const [alertType, setAlertType] =
+        useState<AlertType>("info");
+    const [alertConfirmText, setAlertConfirmText] =
+        useState("OK");
+    const [alertShowCancel, setAlertShowCancel] =
+        useState(false);
+    const [alertConfirmAction, setAlertConfirmAction] =
+        useState<() => void>(() => {});
+
+    const showAlert = ({
+        title,
+        message,
+        type = "info",
+        confirmText = "OK",
+        showCancel = false,
+        onConfirm,
+    }: {
+        title: string;
+        message: string;
+        type?: AlertType;
+        confirmText?: string;
+        showCancel?: boolean;
+        onConfirm?: () => void;
+    }) => {
+        setAlertTitle(title);
+        setAlertMessage(message);
+        setAlertType(type);
+        setAlertConfirmText(confirmText);
+        setAlertShowCancel(showCancel);
+
+        setAlertConfirmAction(() => () => {
+            setAlertVisible(false);
+            onConfirm?.();
+        });
+
+        setAlertVisible(true);
+    };
+
+    const closeAlert = () => {
+        setAlertVisible(false);
+    };
+
     const loadProfile = async () => {
         try {
             setLoading(true);
 
-            const token = await AsyncStorage.getItem("token");
+            const token =
+                await AsyncStorage.getItem("token");
 
             const res = await api.get("/auth/profile", {
                 headers: {
@@ -47,9 +96,18 @@ export default function Profile() {
 
             setUser(res.data);
         } catch (error: any) {
-            console.log(error.response?.data || error);
+            console.log(
+                error?.response?.data || error
+            );
 
-            Alert.alert("Error", "Failed to load profile.");
+            showAlert({
+                title: "Unable to load profile",
+                message:
+                    "We couldn't load your profile. Please try again.",
+                type: "error",
+                confirmText: "Try Again",
+                onConfirm: loadProfile,
+            });
         } finally {
             setLoading(false);
         }
@@ -61,142 +119,330 @@ export default function Profile() {
         }, [])
     );
 
-    const logout = async () => {
-        Alert.alert(
-            "Logout",
-            "Are you sure you want to logout?",
-            [
-                {
-                    text: "Cancel",
-                    style: "cancel",
-                },
-                {
-                    text: "Logout",
-                    style: "destructive",
-                    onPress: async () => {
-                        await AsyncStorage.removeItem("token");
-                        await AsyncStorage.removeItem("userId");
+    const logout = () => {
+        showAlert({
+            title: "Logout",
+            message:
+                "Are you sure you want to sign out of your Salema account?",
+            type: "warning",
+            confirmText: "Logout",
+            showCancel: true,
+            onConfirm: async () => {
+                try {
+                    await api.post("/auth/logout");
+                } catch (error) {
+                    console.log(
+                        "Logout API error:",
+                        error
+                    );
+                }
 
-                        router.replace("/login");
-                    },
-                },
-            ]
+                await AsyncStorage.removeItem("token");
+                await AsyncStorage.removeItem("userId");
+
+                router.replace("/login");
+            },
+        });
+    };
+
+    const formatMemberSince = (date: string) => {
+        if (!date) return "—";
+
+        const parsedDate = new Date(date);
+
+        if (isNaN(parsedDate.getTime())) {
+            return "—";
+        }
+
+        return parsedDate.toLocaleDateString(
+            "en-ZA",
+            {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+            }
         );
     };
 
     if (loading) {
         return (
             <SafeAreaView style={styles.loader}>
-                <ActivityIndicator size="large" color="#002E15" />
-                <Text style={styles.loading}>Loading Profile...</Text>
+                <StatusBar barStyle="dark-content" />
+
+                <View style={styles.loaderIcon}>
+                    <Ionicons
+                        name="person-outline"
+                        size={32}
+                        color="#002E15"
+                    />
+                </View>
+
+                <ActivityIndicator
+                    size="small"
+                    color="#002E15"
+                    style={{ marginTop: 18 }}
+                />
+
+                <Text style={styles.loading}>
+                    Loading your profile...
+                </Text>
             </SafeAreaView>
         );
     }
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" />
+            <StatusBar
+                barStyle="dark-content"
+                backgroundColor="#FFFFFF"
+            />
 
             <Header />
 
-            <ScrollView contentContainerStyle={styles.content}>
-
-                <View style={styles.profileCard}>
-
-                    <View style={styles.avatar}>
-                        <Ionicons name="person" size={60} color="#fff" />
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.content}
+            >
+                {/* PROFILE HERO */}
+                <View style={styles.profileHero}>
+                    <View style={styles.heroTop}>
+                        <View style={styles.avatar}>
+                            <Ionicons
+                                name="person"
+                                size={52}
+                                color="#002E15"
+                            />
+                        </View>
                     </View>
 
-                    <Text style={styles.name}>{user?.fullName}</Text>
-
-                    <View style={styles.roleBadge}>
-                        <Text style={styles.roleText}>
-                            {user?.role.toUpperCase()}
+                    <View style={styles.profileDetails}>
+                        <Text style={styles.name}>
+                            {user?.fullName || "User"}
                         </Text>
-                    </View>
 
+                        <View style={styles.roleBadge}>
+                            <View
+                                style={styles.statusDot}
+                            />
+
+                            <Text
+                                style={styles.roleText}
+                            >
+                                {user?.role
+                                    ? user.role.toUpperCase()
+                                    : "USER"}
+                            </Text>
+                        </View>
+                    </View>
                 </View>
 
-                <View style={styles.card}>
-
-                    <Text style={styles.cardTitle}>
+                {/* PERSONAL INFORMATION */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>
                         Personal Information
                     </Text>
 
+                    <Text
+                        style={styles.sectionSubtitle}
+                    >
+                        Your account details
+                    </Text>
+                </View>
+
+                <View style={styles.infoCard}>
                     <InfoRow
                         icon="mail-outline"
                         label="Email"
-                        value={user?.email || ""}
+                        value={user?.email || "—"}
                     />
 
                     <InfoRow
                         icon="call-outline"
                         label="Phone Number"
-                        value={user?.phoneNumber || ""}
+                        value={
+                            user?.phoneNumber || "—"
+                        }
                     />
 
                     <InfoRow
                         icon="location-outline"
                         label="Address"
-                        value={user?.address || ""}
+                        value={
+                            user?.address || "—"
+                        }
                     />
 
                     <InfoRow
                         icon="calendar-outline"
                         label="Member Since"
-                        value={new Date(
+                        value={formatMemberSince(
                             user?.createdAt || ""
-                        ).toDateString()}
+                        )}
+                        last
                     />
-
                 </View>
 
-                <TouchableOpacity
-                    style={styles.button}
-                    onPress={() => router.push("/edit-profile")}
+                {/* ACCOUNT */}
+                <View
+                    style={[
+                        styles.sectionHeader,
+                        styles.accountHeader,
+                    ]}
                 >
-                    <Ionicons
-                        name="create-outline"
-                        size={22}
-                        color="#fff"
-                    />
-
-                    <Text style={styles.buttonText}>
-                        Edit Profile
+                    <Text style={styles.sectionTitle}>
+                        Account
                     </Text>
+
+                    <Text
+                        style={styles.sectionSubtitle}
+                    >
+                        Manage your account
+                    </Text>
+                </View>
+
+                {/* EDIT PROFILE */}
+                <TouchableOpacity
+                    style={styles.primaryAction}
+                    onPress={() =>
+                        router.push("/edit-profile")
+                    }
+                    activeOpacity={0.8}
+                >
+                    <View
+                        style={
+                            styles.actionIconPrimary
+                        }
+                    >
+                        <Ionicons
+                            name="create-outline"
+                            size={22}
+                            color="#FFFFFF"
+                        />
+                    </View>
+
+                    <View style={styles.actionContent}>
+                        <Text
+                            style={
+                                styles.primaryActionTitle
+                            }
+                        >
+                            Edit Profile
+                        </Text>
+
+                        <Text
+                            style={
+                                styles.primaryActionSubtitle
+                            }
+                        >
+                            Update your personal
+                            information
+                        </Text>
+                    </View>
+
+                    <Ionicons
+                        name="chevron-forward"
+                        size={21}
+                        color="#B4E0B7"
+                    />
                 </TouchableOpacity>
 
+                {/* CHANGE PASSWORD */}
                 <TouchableOpacity
-                    style={styles.button}
-                    onPress={() => router.push("/change-password")}
+                    style={styles.secondaryAction}
+                    onPress={() =>
+                        router.push("/change-password")
+                    }
+                    activeOpacity={0.8}
                 >
-                    <Ionicons
-                        name="lock-closed-outline"
-                        size={22}
-                        color="#fff"
-                    />
+                    <View
+                        style={
+                            styles.actionIconSecondary
+                        }
+                    >
+                        <Ionicons
+                            name="lock-closed-outline"
+                            size={22}
+                            color="#002E15"
+                        />
+                    </View>
 
-                    <Text style={styles.buttonText}>
-                        Change Password
-                    </Text>
+                    <View style={styles.actionContent}>
+                        <Text
+                            style={
+                                styles.secondaryActionTitle
+                            }
+                        >
+                            Change Password
+                        </Text>
+
+                        <Text
+                            style={
+                                styles.secondaryActionSubtitle
+                            }
+                        >
+                            Keep your account secure
+                        </Text>
+                    </View>
+
+                    <Ionicons
+                        name="chevron-forward"
+                        size={21}
+                        color="#002E15"
+                    />
                 </TouchableOpacity>
 
+                {/* LOGOUT */}
                 <TouchableOpacity
-                    style={styles.logoutButton}
+                    style={styles.logoutAction}
                     onPress={logout}
+                    activeOpacity={0.8}
                 >
-                    <Ionicons
-                        name="log-out-outline"
-                        size={22}
-                        color="#fff"
-                    />
+                    <View style={styles.logoutIcon}>
+                        <Ionicons
+                            name="log-out-outline"
+                            size={22}
+                            color="#D32F2F"
+                        />
+                    </View>
 
-                    <Text style={styles.buttonText}>
-                        Logout
-                    </Text>
+                    <View style={styles.actionContent}>
+                        <Text
+                            style={styles.logoutTitle}
+                        >
+                            Logout
+                        </Text>
+
+                        <Text
+                            style={styles.logoutSubtitle}
+                        >
+                            Sign out of your Salema
+                            account
+                        </Text>
+                    </View>
+
+                    <Ionicons
+                        name="chevron-forward"
+                        size={21}
+                        color="#D32F2F"
+                    />
                 </TouchableOpacity>
 
+                <Text style={styles.footer}>
+                    Salema • Your safety matters
+                </Text>
             </ScrollView>
+
+            {/* CUSTOM ALERT */}
+            <CustomAlert
+                visible={alertVisible}
+                title={alertTitle}
+                message={alertMessage}
+                type={alertType}
+                confirmText={alertConfirmText}
+                showCancel={alertShowCancel}
+                onConfirm={alertConfirmAction}
+                onCancel={closeAlert}
+            />
         </SafeAreaView>
     );
 }
@@ -205,22 +451,39 @@ function InfoRow({
     icon,
     label,
     value,
+    last = false,
 }: {
     icon: any;
     label: string;
     value: string;
+    last?: boolean;
 }) {
     return (
-        <View style={styles.row}>
-            <Ionicons
-                name={icon}
-                size={22}
-                color="#002E15"
-            />
+        <View
+            style={[
+                styles.infoRow,
+                last && styles.lastInfoRow,
+            ]}
+        >
+            <View style={styles.infoIcon}>
+                <Ionicons
+                    name={icon}
+                    size={21}
+                    color="#002E15"
+                />
+            </View>
 
-            <View style={{ marginLeft: 15, flex: 1 }}>
-                <Text style={styles.label}>{label}</Text>
-                <Text style={styles.value}>{value}</Text>
+            <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>
+                    {label}
+                </Text>
+
+                <Text
+                    style={styles.infoValue}
+                    numberOfLines={3}
+                >
+                    {value}
+                </Text>
             </View>
         </View>
     );
@@ -229,127 +492,283 @@ function InfoRow({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#F5F7FA",
+        backgroundColor: "#F5F7F6",
     },
 
     loader: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
+        backgroundColor: "#F5F7F6",
+    },
+
+    loaderIcon: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: "#E7F2E9",
+        justifyContent: "center",
+        alignItems: "center",
     },
 
     loading: {
-        marginTop: 15,
-        fontSize: 16,
-        color: "#555",
+        marginTop: 10,
+        fontSize: 14,
+        color: "#666",
     },
 
     content: {
-        padding: 20,
-        paddingBottom: 40,
+        paddingHorizontal: 18,
+        paddingTop: 18,
+        paddingBottom: 35,
     },
 
-    profileCard: {
-        backgroundColor: "#fff",
-        borderRadius: 22,
+    profileHero: {
+        backgroundColor: "#002E15",
+        borderRadius: 24,
+        overflow: "hidden",
+        marginBottom: 25,
+    },
+
+    heroTop: {
+        height: 85,
+        backgroundColor: "#002E15",
         alignItems: "center",
-        padding: 30,
-        elevation: 6,
-        shadowColor: "#000",
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
+        justifyContent: "flex-end",
     },
 
     avatar: {
-        width: 110,
-        height: 110,
-        borderRadius: 55,
-        backgroundColor: "#002E15",
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: "#B4E0B7",
         justifyContent: "center",
         alignItems: "center",
-    },
-
-    name: {
-        marginTop: 18,
-        fontSize: 26,
-        fontWeight: "700",
-        color: "#1E293B",
-    },
-
-    roleBadge: {
-        marginTop: 14,
-        backgroundColor: "#E8F5E9",
-        paddingHorizontal: 18,
-        paddingVertical: 8,
-        borderRadius: 20,
-    },
-
-    roleText: {
-        color: "#2E7D32",
-        fontWeight: "700",
-    },
-
-    card: {
-        backgroundColor: "#fff",
-        marginTop: 20,
-        borderRadius: 20,
-        padding: 20,
+        borderWidth: 5,
+        borderColor: "#FFFFFF",
+        marginBottom: -50,
         elevation: 5,
         shadowColor: "#000",
-        shadowOpacity: 0.06,
+        shadowOpacity: 0.15,
         shadowRadius: 8,
     },
 
-    cardTitle: {
-        fontSize: 20,
+    profileDetails: {
+        backgroundColor: "#002E15",
+        alignItems: "center",
+        paddingTop: 60,
+        paddingBottom: 22,
+    },
+
+    name: {
+        fontSize: 24,
+        fontWeight: "700",
+        color: "#FFFFFF",
+        textAlign: "center",
+    },
+
+    roleBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor:
+            "rgba(180,224,183,0.18)",
+        paddingHorizontal: 13,
+        paddingVertical: 6,
+        borderRadius: 20,
+        marginTop: 10,
+    },
+
+    statusDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+        backgroundColor: "#B4E0B7",
+        marginRight: 7,
+    },
+
+    roleText: {
+        color: "#B4E0B7",
+        fontSize: 11,
+        fontWeight: "700",
+        letterSpacing: 0.6,
+    },
+
+    sectionHeader: {
+        marginBottom: 11,
+        paddingHorizontal: 3,
+    },
+
+    accountHeader: {
+        marginTop: 26,
+    },
+
+    sectionTitle: {
+        fontSize: 18,
         fontWeight: "700",
         color: "#002E15",
-        marginBottom: 18,
     },
 
-    row: {
+    sectionSubtitle: {
+        fontSize: 12,
+        color: "#8A8F8B",
+        marginTop: 3,
+    },
+
+    infoCard: {
+        backgroundColor: "#FFFFFF",
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        borderWidth: 1,
+        borderColor: "#E7EBE8",
+    },
+
+    infoRow: {
         flexDirection: "row",
-        paddingVertical: 14,
+        alignItems: "center",
+        paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: "#EFEFEF",
+        borderBottomColor: "#EEF1EF",
     },
 
-    label: {
-        color: "#888",
-        fontSize: 13,
+    lastInfoRow: {
+        borderBottomWidth: 0,
     },
 
-    value: {
-        fontSize: 16,
+    infoIcon: {
+        width: 42,
+        height: 42,
+        borderRadius: 12,
+        backgroundColor: "#EAF4EC",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+
+    infoContent: {
+        flex: 1,
+        marginLeft: 13,
+    },
+
+    infoLabel: {
+        fontSize: 11,
+        color: "#8A8F8B",
+        fontWeight: "500",
+        marginBottom: 3,
+    },
+
+    infoValue: {
+        fontSize: 14,
+        color: "#202522",
         fontWeight: "600",
-        color: "#222",
-        marginTop: 4,
+        lineHeight: 20,
     },
 
-    button: {
-        marginTop: 18,
-        height: 55,
-        borderRadius: 14,
+    primaryAction: {
+        minHeight: 72,
         backgroundColor: "#002E15",
-        justifyContent: "center",
-        alignItems: "center",
+        borderRadius: 17,
+        paddingHorizontal: 14,
         flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 11,
     },
 
-    logoutButton: {
-        marginTop: 18,
-        height: 55,
-        borderRadius: 14,
-        backgroundColor: "#D32F2F",
+    actionIconPrimary: {
+        width: 43,
+        height: 43,
+        borderRadius: 12,
+        backgroundColor:
+            "rgba(180,224,183,0.18)",
         justifyContent: "center",
         alignItems: "center",
-        flexDirection: "row",
     },
 
-    buttonText: {
-        color: "#fff",
+    actionContent: {
+        flex: 1,
+        marginHorizontal: 13,
+    },
+
+    primaryActionTitle: {
+        color: "#FFFFFF",
+        fontSize: 15,
         fontWeight: "700",
-        fontSize: 16,
-        marginLeft: 10,
+    },
+
+    primaryActionSubtitle: {
+        color: "#B4E0B7",
+        fontSize: 11,
+        marginTop: 3,
+    },
+
+    secondaryAction: {
+        minHeight: 72,
+        backgroundColor: "#FFFFFF",
+        borderRadius: 17,
+        paddingHorizontal: 14,
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 11,
+        borderWidth: 1,
+        borderColor: "#DDE5DF",
+    },
+
+    actionIconSecondary: {
+        width: 43,
+        height: 43,
+        borderRadius: 12,
+        backgroundColor: "#EAF4EC",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+
+    secondaryActionTitle: {
+        color: "#002E15",
+        fontSize: 15,
+        fontWeight: "700",
+    },
+
+    secondaryActionSubtitle: {
+        color: "#8A8F8B",
+        fontSize: 11,
+        marginTop: 3,
+    },
+
+    logoutAction: {
+        minHeight: 72,
+        backgroundColor: "#FFFFFF",
+        borderRadius: 17,
+        paddingHorizontal: 14,
+        flexDirection: "row",
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: "#F0DADA",
+    },
+
+    logoutIcon: {
+        width: 43,
+        height: 43,
+        borderRadius: 12,
+        backgroundColor: "#FFF1F1",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+
+    logoutTitle: {
+        color: "#D32F2F",
+        fontSize: 15,
+        fontWeight: "700",
+    },
+
+    logoutSubtitle: {
+        color: "#999",
+        fontSize: 11,
+        marginTop: 3,
+    },
+
+    footer: {
+        textAlign: "center",
+        color: "#9AA19C",
+        fontSize: 11,
+        marginTop: 25,
     },
 });
+

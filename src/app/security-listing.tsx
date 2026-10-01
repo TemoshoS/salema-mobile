@@ -1,7 +1,9 @@
 
 import Header from "@/components/Header";
+import CustomAlert from "@/components/CustomAlert";
 import { api } from "@/config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -17,8 +19,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { showError, showSuccess } from "@/utils/toast";
-
 interface SecurityCompany {
   _id: string;
   companyName: string;
@@ -30,6 +30,8 @@ interface SecurityCompany {
   contactPerson?: string;
   role: string;
 }
+
+type AlertType = "error" | "warning" | "success" | "info";
 
 // =====================================================
 // COMPANY CARD
@@ -48,14 +50,8 @@ function CompanyCard({
   onPress,
   index,
 }: CompanyCardProps) {
-  const cardScale = useRef(
-    new Animated.Value(0.96)
-  ).current;
-
-  const cardOpacity = useRef(
-    new Animated.Value(0)
-  ).current;
-
+  const cardScale = useRef(new Animated.Value(0.96)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
   const radioScale = useRef(
     new Animated.Value(isSelected ? 1 : 0)
   ).current;
@@ -64,17 +60,17 @@ function CompanyCard({
     Animated.parallel([
       Animated.timing(cardOpacity, {
         toValue: 1,
-        duration: 350,
-        delay: index * 70,
+        duration: 420,
+        delay: index * 80,
         easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }),
 
       Animated.spring(cardScale, {
         toValue: 1,
-        delay: index * 70,
+        delay: index * 80,
         friction: 7,
-        tension: 60,
+        tension: 55,
         useNativeDriver: true,
       }),
     ]).start();
@@ -91,7 +87,7 @@ function CompanyCard({
 
   const handlePressIn = () => {
     Animated.spring(cardScale, {
-      toValue: 0.97,
+      toValue: 0.975,
       friction: 7,
       tension: 100,
       useNativeDriver: true,
@@ -107,6 +103,9 @@ function CompanyCard({
     }).start();
   };
 
+  const initial =
+    item.companyName?.charAt(0)?.toUpperCase() || "S";
+
   return (
     <Animated.View
       style={{
@@ -115,7 +114,7 @@ function CompanyCard({
       }}
     >
       <TouchableOpacity
-        activeOpacity={0.9}
+        activeOpacity={0.92}
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -127,27 +126,29 @@ function CompanyCard({
             isSelected && styles.selectedCard,
           ]}
         >
-          {/* Glass highlight */}
-          <View
-            pointerEvents="none"
-            style={styles.glassHighlight}
-          />
+          {/* Selected accent */}
+          {isSelected && (
+            <View style={styles.selectedAccent} />
+          )}
 
-          {/* Company Icon */}
+          {/* Company Logo */}
           <View
             style={[
               styles.companyIcon,
               isSelected && styles.companyIconSelected,
             ]}
           >
-            <Text style={styles.companyIconText}>
-              {item.companyName
-                ?.charAt(0)
-                ?.toUpperCase() || "S"}
+            <Text
+              style={[
+                styles.companyIconText,
+                isSelected && styles.companyIconTextSelected,
+              ]}
+            >
+              {initial}
             </Text>
           </View>
 
-          {/* Company Information */}
+          {/* Company Content */}
           <View style={styles.companyInfo}>
             <View style={styles.companyNameRow}>
               <Text
@@ -159,6 +160,12 @@ function CompanyCard({
 
               {isSelected && (
                 <View style={styles.selectedBadge}>
+                  <Ionicons
+                    name="checkmark"
+                    size={10}
+                    color="#002E15"
+                  />
+
                   <Text style={styles.selectedBadgeText}>
                     SELECTED
                   </Text>
@@ -167,25 +174,51 @@ function CompanyCard({
             </View>
 
             {item.contactPerson && (
-              <Text
-                style={styles.detail}
-                numberOfLines={1}
-              >
-                {item.contactPerson}
-              </Text>
+              <View style={styles.infoRow}>
+                <Ionicons
+                  name="person-outline"
+                  size={13}
+                  color="#8A8A8A"
+                />
+
+                <Text
+                  style={styles.detail}
+                  numberOfLines={1}
+                >
+                  {item.contactPerson}
+                </Text>
+              </View>
             )}
 
-            <Text style={styles.detail}>
-              {item.phoneNumber}
-            </Text>
+            {item.phoneNumber && (
+              <View style={styles.infoRow}>
+                <Ionicons
+                  name="call-outline"
+                  size={13}
+                  color="#8A8A8A"
+                />
+
+                <Text style={styles.detail}>
+                  {item.phoneNumber}
+                </Text>
+              </View>
+            )}
 
             {item.address && (
-              <Text
-                style={styles.address}
-                numberOfLines={2}
-              >
-                {item.address}
-              </Text>
+              <View style={styles.infoRow}>
+                <Ionicons
+                  name="location-outline"
+                  size={13}
+                  color="#8A8A8A"
+                />
+
+                <Text
+                  style={styles.address}
+                  numberOfLines={1}
+                >
+                  {item.address}
+                </Text>
+              </View>
             )}
           </View>
 
@@ -201,14 +234,16 @@ function CompanyCard({
                 styles.radioDot,
                 {
                   opacity: radioScale,
-                  transform: [
-                    {
-                      scale: radioScale,
-                    },
-                  ],
+                  transform: [{ scale: radioScale }],
                 },
               ]}
-            />
+            >
+              <Ionicons
+                name="checkmark"
+                size={12}
+                color="#fff"
+              />
+            </Animated.View>
           </View>
         </View>
       </TouchableOpacity>
@@ -227,20 +262,74 @@ export default function SecurityListing() {
 
   const [loading, setLoading] = useState(true);
 
-  const [refreshing, setRefreshing] =
-    useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [selectedCompany, setSelectedCompany] =
     useState<SecurityCompany | null>(null);
 
   const [error, setError] = useState("");
 
+  // =====================================================
+  // CUSTOM ALERT
+  // =====================================================
+
+  const [alert, setAlert] = useState({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info" as AlertType,
+    confirmText: "OK",
+    cancelText: "Cancel",
+    showCancel: false,
+    onConfirm: () => {},
+  });
+
   const bottomAnimation = useRef(
     new Animated.Value(0)
   ).current;
 
   // =====================================================
-  // GET SECURITY COMPANIES
+  // SHOW ALERT
+  // =====================================================
+
+  const showAlert = ({
+    title,
+    message,
+    type = "info",
+    confirmText = "OK",
+    cancelText = "Cancel",
+    showCancel = false,
+    onConfirm,
+  }: {
+    title: string;
+    message: string;
+    type?: AlertType;
+    confirmText?: string;
+    cancelText?: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+  }) => {
+    setAlert({
+      visible: true,
+      title,
+      message,
+      type,
+      confirmText,
+      cancelText,
+      showCancel,
+      onConfirm: onConfirm || (() => {}),
+    });
+  };
+
+  const closeAlert = () => {
+    setAlert((prev) => ({
+      ...prev,
+      visible: false,
+    }));
+  };
+
+  // =====================================================
+  // FETCH COMPANIES
   // =====================================================
 
   const fetchSecurityCompanies = async () => {
@@ -256,7 +345,6 @@ export default function SecurityListing() {
 
       setCompanies(companyList);
 
-      // Restore saved selection
       const selectedId =
         await AsyncStorage.getItem(
           "selectedSecurityCompanyId"
@@ -268,11 +356,7 @@ export default function SecurityListing() {
             company._id === selectedId
         );
 
-        if (savedCompany) {
-          setSelectedCompany(savedCompany);
-        } else {
-          setSelectedCompany(null);
-        }
+        setSelectedCompany(savedCompany || null);
       } else {
         setSelectedCompany(null);
       }
@@ -303,7 +387,7 @@ export default function SecurityListing() {
   );
 
   // =====================================================
-  // BOTTOM BUTTON ANIMATION
+  // BOTTOM ANIMATION
   // =====================================================
 
   useEffect(() => {
@@ -325,17 +409,13 @@ export default function SecurityListing() {
   };
 
   // =====================================================
-  // SELECT / UNSELECT
+  // SELECT COMPANY
   // =====================================================
 
   const handleSelectCompany = async (
     company: SecurityCompany
   ) => {
     try {
-      // ==========================================
-      // UNSELECT
-      // ==========================================
-
       if (selectedCompany?._id === company._id) {
         setSelectedCompany(null);
 
@@ -345,29 +425,19 @@ export default function SecurityListing() {
           "selectedSecurityCompanyPhone",
         ]);
 
-        console.log(
-          "Security company unselected:",
-          company.companyName
-        );
-
         return;
       }
 
-      // ==========================================
-      // SELECT
-      // ==========================================
-
       setSelectedCompany(company);
-
-      console.log(
-        "Security company selected:",
-        company.companyName
-      );
     } catch (error) {
-      console.log(
-        "Selection error:",
-        error
-      );
+      console.log("Selection error:", error);
+
+      showAlert({
+        title: "Selection Failed",
+        message:
+          "We could not update your security company selection.",
+        type: "error",
+      });
     }
   };
 
@@ -375,46 +445,46 @@ export default function SecurityListing() {
   // CONFIRM SELECTION
   // =====================================================
 
- const handleConfirmSelection = async () => {
-  if (!selectedCompany) return;
+  const handleConfirmSelection = async () => {
+    if (!selectedCompany) return;
 
-  try {
-    await AsyncStorage.multiSet([
-      [
-        "selectedSecurityCompanyId",
-        selectedCompany._id,
-      ],
-      [
-        "selectedSecurityCompanyName",
-        selectedCompany.companyName,
-      ],
-      [
-        "selectedSecurityCompanyPhone",
-        selectedCompany.phoneNumber,
-      ],
-    ]);
+    try {
+      await AsyncStorage.multiSet([
+        [
+          "selectedSecurityCompanyId",
+          selectedCompany._id,
+        ],
+        [
+          "selectedSecurityCompanyName",
+          selectedCompany.companyName,
+        ],
+        [
+          "selectedSecurityCompanyPhone",
+          selectedCompany.phoneNumber,
+        ],
+      ]);
 
-    showSuccess(
-      `${selectedCompany.companyName} will receive your emergency alerts.`,
-      "Security Company Selected"
-    );
+      showAlert({
+        title: "Security Company Selected",
+        message: `${selectedCompany.companyName} will receive your emergency alerts when you need assistance.`,
+        type: "success",
+        confirmText: "Done",
+      });
+    } catch (error) {
+      console.log(
+        "Error saving security company:",
+        error
+      );
 
-    console.log(
-      "Security company confirmed:",
-      selectedCompany.companyName
-    );
-  } catch (error) {
-    console.log(
-      "Error saving security company:",
-      error
-    );
-
-    showError(
-      "We could not save your security company selection.",
-      "Selection Failed"
-    );
-  }
-};
+      showAlert({
+        title: "Something Went Wrong",
+        message:
+          "We could not save your security company selection. Please try again.",
+        type: "error",
+        confirmText: "Try Again",
+      });
+    }
+  };
 
   // =====================================================
   // LOADING
@@ -423,16 +493,24 @@ export default function SecurityListing() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <Header />
+
         <View style={styles.loadingContainer}>
-          <View style={styles.loadingGlass}>
-            <ActivityIndicator
-              size="small"
-              color="#111"
+          <View style={styles.loadingIcon}>
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={27}
+              color="#002E15"
             />
           </View>
 
+          <ActivityIndicator
+            size="small"
+            color="#002E15"
+          />
+
           <Text style={styles.loadingText}>
-            Loading security companies...
+            Finding security companies...
           </Text>
         </View>
       </SafeAreaView>
@@ -447,45 +525,90 @@ export default function SecurityListing() {
     <SafeAreaView style={styles.container}>
       <Header />
 
-      {/* Water / Glass Background */}
+      {/* Background decoration */}
       <View
         pointerEvents="none"
-        style={styles.glowTop}
+        style={styles.backgroundCircleTop}
       />
 
       <View
         pointerEvents="none"
-        style={styles.glowBottom}
+        style={styles.backgroundCircleBottom}
       />
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>
-          Security Companies
-        </Text>
+        <View style={styles.heroIcon}>
+          <Ionicons
+            name="shield-checkmark"
+            size={25}
+            color="#002E15"
+          />
+        </View>
 
-        <Text style={styles.subtitle}>
-          Select a security company to receive your
-          emergency alerts.
-        </Text>
+        <View style={styles.heroText}>
+          <Text style={styles.eyebrow}>
+            EMERGENCY SUPPORT
+          </Text>
 
-        {selectedCompany && (
-          <View style={styles.selectionHint}>
-            <View style={styles.selectionDot} />
+          <Text style={styles.title}>
+            Your Security Company
+          </Text>
 
-            <Text
-              style={styles.selectionHintText}
-              numberOfLines={1}
-            >
-              {selectedCompany.companyName} selected
+          <Text style={styles.subtitle}>
+            Choose who should receive your emergency
+            alerts when you need help.
+          </Text>
+        </View>
+      </View>
+
+
+      {/* Section Header */}
+      {companies.length > 0 && (
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>
+              Available Companies
+            </Text>
+
+            <Text style={styles.sectionSubtitle}>
+              {companies.length}{" "}
+              {companies.length === 1
+                ? "company"
+                : "companies"}{" "}
+              available
             </Text>
           </View>
-        )}
-      </View>
+
+          <View style={styles.secureBadge}>
+            <Ionicons
+              name="lock-closed-outline"
+              size={12}
+              color="#666"
+            />
+
+            <Text style={styles.secureText}>
+              Secure
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* Error */}
       {error ? (
         <View style={styles.errorContainer}>
+          <View style={styles.errorIcon}>
+            <Ionicons
+              name="cloud-offline-outline"
+              size={25}
+              color="#9B1C1C"
+            />
+          </View>
+
+          <Text style={styles.errorTitle}>
+            Unable to load companies
+          </Text>
+
           <Text style={styles.errorText}>
             {error}
           </Text>
@@ -493,27 +616,53 @@ export default function SecurityListing() {
           <TouchableOpacity
             style={styles.retryButton}
             onPress={fetchSecurityCompanies}
+            activeOpacity={0.85}
           >
+            <Ionicons
+              name="refresh"
+              size={16}
+              color="#fff"
+            />
+
             <Text style={styles.retryText}>
-              Retry
+              Try Again
             </Text>
           </TouchableOpacity>
         </View>
       ) : companies.length === 0 ? (
         <View style={styles.center}>
-          <View style={styles.emptyGlass}>
-            <Text style={styles.emptyIcon}>
-              ◯
-            </Text>
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconContainer}>
+              <Ionicons
+                name="shield-outline"
+                size={35}
+                color="#777"
+              />
+            </View>
 
             <Text style={styles.emptyTitle}>
-              No Security Companies
+              No Companies Available
             </Text>
 
             <Text style={styles.emptyText}>
-              There are currently no security
-              companies available.
+              There are currently no security companies
+              available in your area.
             </Text>
+
+            <TouchableOpacity
+              style={styles.emptyRefreshButton}
+              onPress={handleRefresh}
+            >
+              <Ionicons
+                name="refresh"
+                size={16}
+                color="#002E15"
+              />
+
+              <Text style={styles.emptyRefreshText}>
+                Refresh
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       ) : (
@@ -534,14 +683,12 @@ export default function SecurityListing() {
                 }
               />
             )}
-            contentContainerStyle={
-              styles.list
-            }
+            contentContainerStyle={styles.list}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
-                tintColor="#111"
+                tintColor="#002E15"
               />
             }
             showsVerticalScrollIndicator={false}
@@ -555,44 +702,92 @@ export default function SecurityListing() {
                 opacity:
                   bottomAnimation.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0.75, 1],
+                    outputRange: [0.9, 1],
                   }),
-
                 transform: [
                   {
                     translateY:
                       bottomAnimation.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [25, 0],
+                        outputRange: [35, 0],
                       }),
                   },
                 ],
               },
             ]}
           >
-            <View
-              style={styles.bottomGlassLine}
-            />
+            <View style={styles.bottomInner}>
+              {selectedCompany && (
+                <View style={styles.bottomSelection}>
+                  <View style={styles.bottomCheck}>
+                    <Ionicons
+                      name="checkmark"
+                      size={13}
+                      color="#fff"
+                    />
+                  </View>
 
-            <TouchableOpacity
-              style={[
-                styles.continueButton,
-                !selectedCompany &&
-                  styles.disabledButton,
-              ]}
-              disabled={!selectedCompany}
-              activeOpacity={0.85}
-              onPress={handleConfirmSelection}
-            >
-              <Text style={styles.continueText}>
-                {selectedCompany
-                  ? `Continue with ${selectedCompany.companyName}`
-                  : "Select a Security Company"}
-              </Text>
-            </TouchableOpacity>
+                  <View style={styles.bottomSelectionText}>
+                    <Text style={styles.bottomLabel}>
+                      Emergency alerts will be sent to
+                    </Text>
+
+                    <Text
+                      style={styles.bottomCompany}
+                      numberOfLines={1}
+                    >
+                      {selectedCompany.companyName}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.continueButton,
+                  !selectedCompany &&
+                    styles.disabledButton,
+                ]}
+                disabled={!selectedCompany}
+                activeOpacity={0.88}
+                onPress={handleConfirmSelection}
+              >
+                <Text style={styles.continueText}>
+                  {selectedCompany
+                    ? "Confirm Security Company"
+                    : "Select a Security Company"}
+                </Text>
+
+                {selectedCompany && (
+                  <View style={styles.buttonIcon}>
+                    <Ionicons
+                      name="arrow-forward"
+                      size={17}
+                      color="#002E15"
+                    />
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           </Animated.View>
         </>
       )}
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alert.visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        confirmText={alert.confirmText}
+        cancelText={alert.cancelText}
+        showCancel={alert.showCancel}
+        onConfirm={() => {
+          alert.onConfirm();
+          closeAlert();
+        }}
+        onCancel={closeAlert}
+      />
     </SafeAreaView>
   );
 }
@@ -604,96 +799,181 @@ export default function SecurityListing() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "white",
+    backgroundColor: "#F7F9F8",
   },
 
   // ===================================================
   // BACKGROUND
   // ===================================================
 
-  glowTop: {
+  backgroundCircleTop: {
     position: "absolute",
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor:
-      "rgba(255,255,255,0.75)",
-    top: 90,
-    right: -120,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "#EAF2ED",
+    top: 70,
+    right: -150,
+    opacity: 0.7,
   },
 
-  glowBottom: {
+  backgroundCircleBottom: {
     position: "absolute",
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor:
-      "rgba(225,230,233,0.55)",
-    bottom: 130,
-    left: -120,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: "#EEF2F0",
+    bottom: 80,
+    left: -140,
+    opacity: 0.8,
   },
 
   // ===================================================
-  // HEADER
+  // HERO HEADER
   // ===================================================
 
   header: {
+    flexDirection: "row",
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 10,
+    paddingBottom: 15,
+  },
+
+  heroIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 17,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#E7F1EB",
+
+    marginRight: 13,
+  },
+
+  heroText: {
+    flex: 1,
+  },
+
+  eyebrow: {
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1.1,
+    color: "#718078",
+    marginBottom: 3,
   },
 
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "800",
-    letterSpacing: -0.6,
-    color: "#111",
+    letterSpacing: -0.7,
+    color: "#101412",
   },
 
   subtitle: {
-    marginTop: 7,
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#777",
-    maxWidth: 350,
+    marginTop: 5,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#727A76",
+    maxWidth: 340,
   },
 
-  selectionHint: {
+  // ===================================================
+  // CURRENT SELECTION
+  // ===================================================
+
+  currentSelection: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
 
-    marginTop: 12,
+    marginHorizontal: 20,
+    marginBottom: 14,
 
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
 
-    borderRadius: 20,
+    borderRadius: 16,
 
-    backgroundColor:
-      "rgba(255,255,255,0.72)",
+    backgroundColor: "#EEF7F1",
 
     borderWidth: 1,
-    borderColor:
-      "rgba(255,255,255,0.95)",
+    borderColor: "#D7E8DD",
   },
 
-  selectionDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+  currentSelectionIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
 
-    backgroundColor: "#111",
+    alignItems: "center",
+    justifyContent: "center",
 
-    marginRight: 7,
+    backgroundColor: "#DDEEE3",
+
+    marginRight: 10,
   },
 
-  selectionHintText: {
-    maxWidth: 260,
+  currentSelectionContent: {
+    flex: 1,
+  },
 
-    fontSize: 12,
+  currentLabel: {
+    fontSize: 8.5,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    color: "#718078",
+    marginBottom: 2,
+  },
+
+  currentCompany: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#173A27",
+  },
+
+  // ===================================================
+  // SECTION
+  // ===================================================
+
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#171B19",
+  },
+
+  sectionSubtitle: {
+    marginTop: 2,
+    fontSize: 11,
+    color: "#8A918D",
+  },
+
+  secureBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+
+    borderRadius: 10,
+
+    backgroundColor: "#ECEFED",
+  },
+
+  secureText: {
+    marginLeft: 4,
+    fontSize: 10,
     fontWeight: "600",
-    color: "#444",
+    color: "#666D69",
   },
 
   // ===================================================
@@ -702,108 +982,107 @@ const styles = StyleSheet.create({
 
   list: {
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 150,
+    paddingTop: 2,
+    paddingBottom: 205,
   },
 
   cardWrapper: {
-    marginBottom: 13,
+    marginBottom: 11,
   },
 
- companyCard: {
-  position: "relative",
+  companyCard: {
+    position: "relative",
 
-  flexDirection: "row",
-  alignItems: "center",
+    flexDirection: "row",
+    alignItems: "center",
 
-  minHeight: 105,
+    minHeight: 98,
 
-  padding: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
 
-  borderRadius: 22,
+    borderRadius: 20,
 
-  overflow: "hidden",
+    backgroundColor: "#FFFFFF",
 
-  backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ECEFEE",
 
-  borderWidth: 0,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.045,
+    shadowRadius: 12,
 
-  shadowColor: "#000",
+    elevation: 2,
 
-  shadowOffset: {
-    width: 0,
-    height: 5,
+    overflow: "hidden",
   },
 
-  shadowOpacity: 0.05,
-  shadowRadius: 15,
+  selectedCard: {
+    borderColor: "#9EB9A8",
+    backgroundColor: "#FBFDFC",
 
-  elevation: 2,
-},
+    shadowOpacity: 0.09,
+    shadowRadius: 16,
 
-selectedCard: {
-  backgroundColor: "#fff",
+    elevation: 4,
+  },
 
-  borderColor: "#002E15",
-
-  borderWidth: 1.5,
-
-  shadowOpacity: 0.10,
-  shadowRadius: 18,
-
-  elevation: 4,
-},
-
-  glassHighlight: {
+  selectedAccent: {
     position: "absolute",
+    left: 0,
+    top: 16,
+    bottom: 16,
 
-    top: 0,
-    left: 22,
-    right: 22,
+    width: 3,
 
-    height: 1,
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
 
-    backgroundColor:
-      "rgba(255,255,255,0.95)",
+    backgroundColor: "#002E15",
   },
 
   // ===================================================
-  // ICON
+  // COMPANY ICON
   // ===================================================
 
   companyIcon: {
     width: 52,
     height: 52,
 
-    borderRadius: 18,
+    borderRadius: 17,
 
     alignItems: "center",
     justifyContent: "center",
 
-    marginRight: 14,
+    marginRight: 12,
 
-    backgroundColor:
-      "rgba(245,246,247,0.85)",
+    backgroundColor: "#F1F3F2",
 
     borderWidth: 1,
-
-    borderColor:
-      "rgba(0,0,0,0.05)",
+    borderColor: "#E6E9E7",
   },
 
- companyIconSelected: {
-  backgroundColor: "#EEF6F3",
-  borderColor: "#002E15",
-},
+  companyIconSelected: {
+    backgroundColor: "#E7F2EA",
+    borderColor: "#CFE1D5",
+  },
 
   companyIconText: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#222",
+    color: "#414743",
+  },
+
+  companyIconTextSelected: {
+    color: "#002E15",
   },
 
   // ===================================================
-  // COMPANY INFO
+  // COMPANY INFORMATION
   // ===================================================
 
   companyInfo: {
@@ -821,45 +1100,61 @@ selectedCard: {
   companyName: {
     flex: 1,
 
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
 
-    color: "#111",
+    color: "#161A18",
 
     letterSpacing: -0.2,
   },
 
   selectedBadge: {
-    marginLeft: 7,
+    flexDirection: "row",
+    alignItems: "center",
 
-    paddingHorizontal: 7,
+    marginLeft: 6,
+
+    paddingHorizontal: 6,
     paddingVertical: 3,
 
-    borderRadius: 8,
+    borderRadius: 7,
 
-    backgroundColor:
-      "rgba(0,0,0,0.055)",
+    backgroundColor: "#E5F1E9",
   },
 
   selectedBadgeText: {
-    fontSize: 8,
-    fontWeight: "700",
-    color: "#555",
+    marginLeft: 2,
+
+    fontSize: 7.5,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+
+    color: "#002E15",
   },
 
-  detail: {
-    fontSize: 12.5,
-    color: "#666",
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+
     marginTop: 2,
   },
 
-  address: {
+  detail: {
+    flex: 1,
+
+    marginLeft: 5,
+
     fontSize: 11.5,
-    lineHeight: 16,
+    color: "#727975",
+  },
 
-    color: "#888",
+  address: {
+    flex: 1,
 
-    marginTop: 4,
+    marginLeft: 5,
+
+    fontSize: 11,
+    color: "#8A918D",
   },
 
   // ===================================================
@@ -867,38 +1162,39 @@ selectedCard: {
   // ===================================================
 
   radio: {
-    width: 23,
-    height: 23,
+    width: 25,
+    height: 25,
 
-    borderRadius: 12,
+    borderRadius: 13,
 
-    borderWidth: 1.7,
-    borderColor: "#b8b8b8",
+    borderWidth: 1.6,
+    borderColor: "#C3C9C5",
 
     alignItems: "center",
     justifyContent: "center",
 
-    marginLeft: 10,
+    marginLeft: 9,
 
-    backgroundColor:
-      "rgba(255,255,255,0.65)",
+    backgroundColor: "#FAFBFA",
   },
 
- radioSelected: {
-  borderColor: "#002E15",
-  backgroundColor: "#fff",
-},
-radioDot: {
-  width: 11,
-  height: 11,
+  radioSelected: {
+    borderColor: "#002E15",
+    backgroundColor: "#002E15",
+  },
 
-  borderRadius: 6,
+  radioDot: {
+    width: 19,
+    height: 19,
 
-  backgroundColor: "#002E15",
-},
+    borderRadius: 10,
+
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   // ===================================================
-  // BOTTOM
+  // BOTTOM ACTION
   // ===================================================
 
   bottomContainer: {
@@ -908,71 +1204,112 @@ radioDot: {
     right: 0,
     bottom: 0,
 
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 20,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 17,
 
-    backgroundColor: "white",
+    backgroundColor: "rgba(247,249,248,0.98)",
 
     borderTopWidth: 1,
-
-    borderTopColor:
-      "white",
+    borderTopColor: "#E8EBE9",
   },
 
-  bottomGlassLine: {
-    position: "absolute",
+  bottomInner: {
+    width: "100%",
+  },
 
-    top: 0,
-    left: 40,
-    right: 40,
+  bottomSelection: {
+    flexDirection: "row",
+    alignItems: "center",
 
-    height: 1,
+    marginBottom: 9,
 
-    backgroundColor:
-      "white",
+    paddingHorizontal: 4,
+  },
+
+  bottomCheck: {
+    width: 25,
+    height: 25,
+
+    borderRadius: 13,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#002E15",
+
+    marginRight: 8,
+  },
+
+  bottomSelectionText: {
+    flex: 1,
+  },
+
+  bottomLabel: {
+    fontSize: 9.5,
+    color: "#818883",
+  },
+
+  bottomCompany: {
+    marginTop: 1,
+
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#202622",
   },
 
   continueButton: {
-  minHeight: 54,
+    minHeight: 55,
 
-  borderRadius: 17,
+    borderRadius: 17,
 
-  alignItems: "center",
-  justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
 
-  paddingHorizontal: 16,
+    paddingHorizontal: 17,
 
-  backgroundColor: "#002E15",
+    backgroundColor: "#002E15",
 
-  shadowColor: "#000",
-
-  shadowOffset: {
-    width: 0,
-    height: 7,
+    shadowColor: "#002E15",
+    shadowOffset: {
+      width: 0,
+      height: 7,
+    },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+   marginBottom: 20,
+    elevation: 5,
   },
 
-  shadowOpacity: 0.12,
-  shadowRadius: 15,
-
-  elevation: 5,
-},
-
   disabledButton: {
-    backgroundColor:
-      "rgba(185,185,185,0.70)",
+    backgroundColor: "#B9BFBB",
 
     shadowOpacity: 0,
     elevation: 0,
   },
 
   continueText: {
-    color: "#fff",
+    color: "#FFFFFF",
 
-    fontSize: 14.5,
+    fontSize: 14,
     fontWeight: "700",
 
     textAlign: "center",
+  },
+
+  buttonIcon: {
+    width: 30,
+    height: 30,
+
+    borderRadius: 10,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#FFFFFF",
+
+    marginLeft: 10,
   },
 
   // ===================================================
@@ -986,42 +1323,25 @@ radioDot: {
     justifyContent: "center",
   },
 
-  loadingGlass: {
-    width: 54,
-    height: 54,
+  loadingIcon: {
+    width: 62,
+    height: 62,
 
-    borderRadius: 27,
+    borderRadius: 21,
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor:
-      "rgba(255,255,255,0.75)",
+    backgroundColor: "#E7F1EB",
 
-    borderWidth: 1,
-
-    borderColor:
-      "rgba(255,255,255,0.95)",
-
-    shadowColor: "#000",
-
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-
-    elevation: 2,
+    marginBottom: 18,
   },
 
   loadingText: {
-    marginTop: 12,
+    marginTop: 10,
 
     fontSize: 13,
-
-    color: "#666",
+    color: "#737A76",
   },
 
   // ===================================================
@@ -1034,12 +1354,12 @@ radioDot: {
     alignItems: "center",
     justifyContent: "center",
 
-    padding: 30,
+    paddingHorizontal: 25,
+    paddingBottom: 80,
   },
 
-  emptyGlass: {
+  emptyCard: {
     width: "100%",
-    maxWidth: 350,
 
     padding: 28,
 
@@ -1047,53 +1367,74 @@ radioDot: {
 
     alignItems: "center",
 
-    backgroundColor:
-      "rgba(255,255,255,0.70)",
+    backgroundColor: "#FFFFFF",
 
     borderWidth: 1,
-
-    borderColor:
-      "rgba(255,255,255,0.95)",
+    borderColor: "#E9ECEA",
 
     shadowColor: "#000",
-
     shadowOffset: {
       width: 0,
-      height: 7,
+      height: 5,
     },
-
     shadowOpacity: 0.05,
-    shadowRadius: 18,
+    shadowRadius: 16,
 
     elevation: 2,
   },
 
-  emptyIcon: {
-    fontSize: 34,
+  emptyIconContainer: {
+    width: 66,
+    height: 66,
 
-    color: "#aaa",
+    borderRadius: 22,
 
-    marginBottom: 10,
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#EFF2F0",
+
+    marginBottom: 14,
   },
 
   emptyTitle: {
-    fontSize: 19,
-
+    fontSize: 18,
     fontWeight: "700",
-
-    color: "#111",
+    color: "#171B19",
   },
 
   emptyText: {
-    marginTop: 8,
+    marginTop: 7,
 
     fontSize: 13,
-
-    lineHeight: 20,
+    lineHeight: 19,
 
     textAlign: "center",
 
-    color: "#777",
+    color: "#7B827E",
+  },
+
+  emptyRefreshButton: {
+    flexDirection: "row",
+    alignItems: "center",
+
+    marginTop: 18,
+
+    paddingHorizontal: 17,
+    paddingVertical: 10,
+
+    borderRadius: 12,
+
+    backgroundColor: "#E8F1EB",
+  },
+
+  emptyRefreshText: {
+    marginLeft: 6,
+
+    fontSize: 12,
+    fontWeight: "700",
+
+    color: "#002E15",
   },
 
   // ===================================================
@@ -1101,48 +1442,72 @@ radioDot: {
   // ===================================================
 
   errorContainer: {
-    margin: 20,
+    marginHorizontal: 20,
+    marginTop: 10,
 
-    padding: 22,
+    padding: 24,
 
-    borderRadius: 20,
+    borderRadius: 22,
 
     alignItems: "center",
 
-    backgroundColor:
-      "rgba(255,255,255,0.75)",
+    backgroundColor: "#FFFFFF",
 
     borderWidth: 1,
+    borderColor: "#F0DADA",
+  },
 
-    borderColor:
-      "rgba(0,0,0,0.06)",
+  errorIcon: {
+    width: 54,
+    height: 54,
+
+    borderRadius: 18,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#FCEEEE",
+
+    marginBottom: 12,
+  },
+
+  errorTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#351818",
   },
 
   errorText: {
-    fontSize: 13,
+    marginTop: 6,
+
+    fontSize: 12.5,
+    lineHeight: 19,
 
     textAlign: "center",
 
-    color: "#b00000",
-
-    marginBottom: 15,
+    color: "#777",
   },
 
   retryButton: {
-    paddingHorizontal: 25,
+    flexDirection: "row",
+    alignItems: "center",
 
+    marginTop: 17,
+
+    paddingHorizontal: 20,
     paddingVertical: 11,
 
     borderRadius: 12,
 
-    backgroundColor: "#111",
+    backgroundColor: "#002E15",
   },
 
   retryText: {
-    color: "#fff",
+    marginLeft: 7,
 
-    fontSize: 13,
+    color: "#FFFFFF",
 
+    fontSize: 12.5,
     fontWeight: "700",
   },
 });

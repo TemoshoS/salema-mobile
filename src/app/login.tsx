@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "../config/api";
+import { registerForPushNotificationsAsync } from "@/utils/notifications";
 
 export default function Login() {
   const router = useRouter();
@@ -78,6 +79,7 @@ export default function Login() {
         "userId",
         res.data.user.id
       );
+      await registerForPushNotificationsAsync();
 
       showSuccess(
         "Login successful.",
@@ -126,6 +128,7 @@ export default function Login() {
         "userId",
         res.data.user.id
       );
+      await registerForPushNotificationsAsync();
 
       showSuccess(
         "Login successful.",

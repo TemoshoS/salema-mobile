@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "486960310117",
+    "firebase_url": "https://salema-dce69-default-rtdb.firebaseio.com",
+    "project_id": "salema-dce69",
+    "storage_bucket": "salema-dce69.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:486960310117:android:875431f277882d9ebbe38c",
+        "android_client_info": {
+          "package_name": "com.maduane.salema"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "486960310117-k0nbl3rvf63hah1gqlidinebcoblva97.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBihuAvgtPz5EsDz-upGgd2_zAa2Jp9xPs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "486960310117-k0nbl3rvf63hah1gqlidinebcoblva97.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
